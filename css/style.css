@@ -127,3 +127,65 @@ h1, h2, h3, p { margin: 0; }
 .skeleton { height: 92px; border-radius: var(--radius); background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%); background-size: 200% 100%; animation: sh 1.4s linear infinite; }
 @keyframes sh { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+
+/* Ocultar de verdad lo que tiene [hidden] */
+[hidden] { display: none !important; }
+
+/* Formularios en hoja inferior */
+dialog#dlg {
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg);
+  padding: 0; width: min(560px, 100%); max-height: min(92dvh, 100%);
+  margin: auto auto 0; border-radius: 14px 14px 0 0; overflow: hidden;
+}
+@media (min-width: 700px) { dialog#dlg { margin: auto; border-radius: 14px; } }
+dialog#dlg::backdrop { background: rgba(4, 7, 10, .72); }
+.dlg-in { display: flex; flex-direction: column; max-height: min(92dvh, 100%); }
+.dlg-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.dlg-head h2 { font-size: 17px; font-weight: 600; }
+.dlg-body { padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px)); overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+.form { display: flex; flex-direction: column; gap: 12px; }
+.form .hint, .dlg-body .hint { font-size: 13px; color: var(--muted); }
+.sect { padding-top: 14px; border-top: 1px solid var(--line); }
+.sect:first-of-type { border-top: 0; padding-top: 0; }
+.sect h3 { font-size: 15px; font-weight: 600; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field > span { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.field input, .field select {
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 10px 12px; min-height: 44px; width: 100%; font-size: 16px; /* 16px evita el zoom de iOS */
+}
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 3px; }
+.seg-b { background: transparent; border: 0; border-radius: 6px; padding: 8px; min-height: 38px; color: var(--muted); }
+.seg-b.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.warn-box { border: 1px solid var(--warn); color: var(--warn); border-radius: 6px; padding: 8px 12px; font-size: 14px; }
+.form .btn, .sect .btn { min-height: 44px; }
+
+/* Bandeja */
+.b-item { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: var(--bg); }
+.b-top { display: flex; justify-content: space-between; gap: 12px; }
+.b-text { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.b-actions { display: flex; gap: 8px; }
+.b-actions .btn { flex: 1; }
+
+/* Botón flotante */
+.fab {
+  position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  width: 56px; height: 56px; border-radius: 50%; border: 0; z-index: 8;
+  background: var(--accent); color: #07121f; font-size: 30px; line-height: 1;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .5);
+}
+.fab:hover { filter: brightness(1.08); }
+body { padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
+
+/* Aviso breve */
+.toast {
+  position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px;
+  z-index: 20; font-size: 14px; max-width: calc(100% - 32px);
+}
+.banner { background: #3a2f12; border: 1px solid var(--warn); color: var(--warn); border-radius: 8px; padding: 10px 14px; font-size: 14px; }
+.badge-n { background: var(--warn); color: #1a1405; border-radius: 999px; padding: 0 7px; font-size: 12px; font-weight: 600; margin-left: 6px; }
+
+/* Impuestos */
+.tax-total { font-family: var(--mono); font-size: 22px; font-weight: 500; }

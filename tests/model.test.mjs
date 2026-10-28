@@ -99,3 +99,74 @@ test("shiftPeriod cruza años", () => {
   assert.equal(shiftPeriod("2026-12", 1), "2027-01");
   assert.equal(shiftPeriod("2026-01", -1), "2025-12");
 });
+
+/* ---------------- Etapa 2: impuestos, categorías nuevas, fondo y bandeja ---------------- */
+
+function rawConPanel() {
+  const raw = rawFixture();
+  // Categoría nueva en la columna I, debajo del encabezado
+  const h = raw.Config.values.findIndex((r) => r[0] === "CATEGORÍAS");
+  raw.Config.values[h + 1][8] = "Mascotas";
+  raw.Impuestos = { values: [
+    ["Fecha", "Origen", "Tipo", "Monto (ARS)", "Resumen (AAAA-MM)", "Nota"],
+    ["2026-02-08T03:00:00.000Z", "Visa", "IIBB", 500, "2026-02", ""],
+    ["2026-02-08T03:00:00.000Z", "Visa", "IVA RG 4240", 1500, "2026-02", ""],
+    ["2026-03-08T03:00:00.000Z", "Visa", "IIBB", 700, "2026-03", ""],
+  ] };
+  raw.Bandeja = { values: [
+    ["ID", "Recibido", "Texto original", "Monto", "Comercio", "Medio", "Tarjeta", "Hora", "Estado", "Clave", "Nota"],
+    ["a1", "2026-02-20T21:04:00.000Z", "Pagaste $6.200 A KIOSCO EJEMPLO", 6200, "KIOSCO EJEMPLO", "Tarjeta de Crédito", "1111", "18:04", "pendiente", "k1", ""],
+    ["a2", "2026-02-20T22:00:00.000Z", "texto raro", "", "", "", "", "", "sin_parsear", "k2", ""],
+    ["a3", "2026-02-19T12:00:00.000Z", "ya cargado", 100, "X", "Débito", "2222", "09:00", "resuelto", "k3", ""],
+  ] };
+  raw.Inversiones = { values: [
+    ["APORTES"], ["x"], ["Fecha", "Monto"],
+    ["2026-02-15T03:00:00.000Z", 50000, "CEDEARs", ""],
+    ["2026-02-16T03:00:00.000Z", 80000, "Fondo de emergencia", ""],
+    ["2026-03-02T03:00:00.000Z", -20000, "fondo de emergencia", "retiro"],
+  ] };
+  raw.Panel_Config = { values: [["Clave", "Valor", "Actualizado"], ["fondo_meta_meses", 3, ""]] };
+  return raw;
+}
+
+test("categorías nuevas se suman a las de la planilla", () => {
+  const m = buildModel(rawConPanel(), "2026-02-20");
+  assert.deepEqual(m.categoriasNuevas, ["Mascotas"]);
+  assert.ok(m.categorias.includes("Mascotas") && m.categorias.includes("Comida"));
+});
+
+test("los impuestos suman al gasto del mes de su resumen y se desglosan por tipo", () => {
+  const m = buildModel(rawConPanel(), "2026-02-20");
+  const feb = m.monthSummary("2026-02");
+  assert.equal(feb.impuestos, 2000);
+  assert.equal(feb.gasto, 1000 + 1000 + 2000);
+  assert.deepEqual(feb.impuestosPorTipo, [{ tipo: "IVA RG 4240", monto: 1500 }, { tipo: "IIBB", monto: 500 }]);
+  assert.equal(buildModel(rawFixture(), "2026-02-20").monthSummary("2026-02").impuestos, 0);
+});
+
+test("la bandeja trae solo lo pendiente o sin entender, ordenado por llegada", () => {
+  const m = buildModel(rawConPanel(), "2026-02-20");
+  assert.deepEqual(m.bandeja.map((b) => b.id), ["a1", "a2"]);
+  assert.equal(m.bandeja[0].fecha, "2026-02-20"); // 21:04 UTC es 18:04 en Argentina
+  assert.equal(m.bandeja[0].monto, 6200);
+  assert.equal(m.bandeja[1].estado, "sin_parsear");
+});
+
+test("fondo de emergencia: saldo con retiros, meta en meses de gasto y avance", () => {
+  const m = buildModel(rawConPanel(), "2026-04-20"); // el primer mes del historial no cuenta: está incompleto
+  assert.equal(m.fondo.saldo, 60000); // 80.000 aportados menos 20.000 retirados
+  assert.equal(m.fondo.metaMeses, 3);
+  assert.ok(m.fondo.gastoPromedio > 0);
+  assert.equal(m.fondo.objetivo, 3 * m.fondo.gastoPromedio);
+  assert.equal(m.fondo.avance, m.fondo.saldo / m.fondo.objetivo);
+});
+
+test("fondo de emergencia sin meta definida no inventa números", () => {
+  const raw = rawConPanel();
+  raw.Panel_Config = { values: [["Clave", "Valor", "Actualizado"]] };
+  const m = buildModel(raw, "2026-03-20");
+  assert.equal(m.fondo.objetivo, 0);
+  assert.equal(m.fondo.avance, null);
+  const sinNada = buildModel(rawFixture(), "2026-03-20");
+  assert.equal(sinNada.fondo.saldo, 0);
+});

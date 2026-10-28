@@ -1,8 +1,8 @@
 // Service worker mínimo: deja la app instalable y abre el armazón rápido.
 // Los datos nunca se guardan acá: las llamadas a la planilla van siempre a la red.
-const CACHE = "finanzas-shell-v1";
+const CACHE = "finanzas-shell-v2";
 const SHELL = [
-  "./", "index.html", "css/style.css", "js/app.js", "js/model.js", "js/api.js", "js/config.js",
+  "./", "index.html", "css/style.css", "js/app.js", "js/model.js", "js/api.js", "js/config.js", "js/fmt.js", "js/util.js", "js/suggest.js", "js/forms.js",
   "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png",
 ];
 

@@ -1,22 +1,21 @@
 import { readAll, ApiError } from "./api.js";
 import { buildModel, semaforo, shiftPeriod, todayYMD } from "./model.js";
+import { buildSuggester, subcategoriesByCat } from "./suggest.js";
+import { initForms, openNew, openBandeja, openAjustes } from "./forms.js";
+import { ars, usd, dec, day, periodLong, periodShort, esc, nfPct } from "./fmt.js";
 
 const app = document.getElementById("app");
-const state = { pin: null, model: null, period: null, showAll: false };
+const state = { pin: null, model: null, period: null, showAll: false, suggest: () => null, subs: {}, scriptOld: false };
 
-/* ---------- formato ---------- */
-const nfARS = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
-const nfUSD = new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
-const nfPct = new Intl.NumberFormat("es-AR", { style: "percent", maximumFractionDigits: 0 });
-const MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-const MES_LARGO = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+function toast(msg) {
+  document.querySelectorAll(".toast").forEach((t) => t.remove());
+  const t = document.createElement("div");
+  t.className = "toast"; t.setAttribute("role", "status"); t.textContent = msg;
+  document.body.append(t);
+  setTimeout(() => t.remove(), 3200);
+}
 
-const ars = (v) => nfARS.format(Math.round(v || 0));
-const usd = (v) => nfUSD.format(v || 0);
-const day = (ymd) => (ymd ? `${Number(ymd.slice(8, 10))} ${MES[Number(ymd.slice(5, 7)) - 1]}` : "");
-const periodLong = (p) => `${MES_LARGO[Number(p.slice(5, 7)) - 1]} ${p.slice(0, 4)}`;
-const periodShort = (p) => `${MES[Number(p.slice(5, 7)) - 1]} ${p.slice(2, 4)}`;
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function lock() { clearPin(); state.model = null; renderLogin(); }
 
 /* ---------- PIN ---------- */
 const KEY = "finanzas_pin";
@@ -187,13 +186,29 @@ function renderDashboard() {
       </div>
     </section>`;
 
-  // Fondo de emergencia (meta a definir)
+  // Fondo de emergencia
+  const f = m.fondo;
   const fondo = `
     <section class="panel">
       <h2>Fondo de emergencia</h2>
-      <div class="meter" aria-hidden="true"><div></div></div>
-      <p><span class="value num">Meta sin definir</span></p>
-      <p class="hint">Todavía no hay una meta cargada. Se va a poder fijar desde el panel en una próxima etapa.</p>
+      <div class="meter" aria-hidden="true"><div style="width:${f.avance == null ? 0 : Math.min(100, f.avance * 100).toFixed(1)}%"></div></div>
+      <p><span class="value num">${ars(f.saldo)}</span> <span class="muted">ahorrado</span></p>
+      <p class="hint">${f.objetivo > 0
+        ? `Meta: ${ars(f.objetivo)}${f.metaMonto > 0 ? "" : ` (${dec(f.metaMeses)} meses de gasto)`} · avance ${nfPct.format(f.avance)}`
+        : "Meta sin definir. Podés fijarla en Ajustes."}${f.cobertura != null ? ` · cubre ${dec(f.cobertura)} meses de tu gasto promedio` : ""}</p>
+    </section>`;
+
+  // Impuestos del mes
+  const tipos = s.impuestosPorTipo;
+  const maxT = Math.max(1, ...tipos.map((t) => t.monto));
+  const impuestos = `
+    <section class="panel">
+      <h2>Impuestos de ${periodLong(p).toLowerCase()}</h2>
+      ${tipos.length ? `
+        <p class="tax-total">${ars(s.impuestos)}</p>
+        <div class="rows">${tipos.map((t) => barRow({ name: t.tipo, amount: ars(t.monto), pct: (t.monto / maxT) * 100 })).join("")}</div>
+        <p class="hint">Ya están incluidos en el gasto del mes.</p>`
+      : `<p class="muted">Sin impuestos cargados para este mes.</p>`}
     </section>`;
 
   // Movimientos
@@ -225,31 +240,39 @@ function renderDashboard() {
         <button class="icon-btn" data-act="next" aria-label="Mes siguiente">›</button>
       </nav>
       <div class="actions">
+        <button class="btn" data-act="bandeja">Por revisar${m.bandeja.length ? `<span class="badge-n">${m.bandeja.length}</span>` : ""}</button>
         <button class="btn" data-act="refresh">Actualizar</button>
-        <button class="btn" data-act="lock">Bloquear</button>
+        <button class="btn" data-act="ajustes">Ajustes</button>
       </div>
     </header>
     <main class="page">
       ${kpis}
       <div class="grid2">
-        <div style="display:flex;flex-direction:column;gap:16px;min-width:0">${forecast}${evolucion}${fondo}</div>
+        <div style="display:flex;flex-direction:column;gap:16px;min-width:0">${forecast}${evolucion}${fondo}${impuestos}</div>
         <div style="display:flex;flex-direction:column;gap:16px;min-width:0">${categorias}${movimientos}</div>
       </div>
       <div class="foot">
         <span>USD/ARS oficial (de tu planilla): <span class="num">${ars(m.cot)}</span></span>
       </div>
-    </main>`;
+    </main>
+    <button class="fab" data-act="nuevo" aria-label="Cargar movimiento">+</button>`;
 }
 
 /* ---------- carga ---------- */
-async function load() {
-  renderLoading();
+async function load({ silent = false } = {}) {
+  if (!silent) renderLoading();
   try {
     const raw = await readAll(state.pin);
     state.model = buildModel(raw);
+    state.suggest = buildSuggester(state.model.movs);
+    state.subs = subcategoriesByCat(state.model.movs);
     if (!state.period) state.period = todayYMD().slice(0, 7);
     renderDashboard();
   } catch (e) {
+    if (silent && !(e instanceof ApiError && e.code === "unauthorized")) {
+      toast("No se pudo actualizar. Tocá Actualizar.");
+      return;
+    }
     if (e instanceof ApiError && e.code === "unauthorized") {
       clearPin();
       renderLogin("PIN incorrecta.");
@@ -283,7 +306,13 @@ app.addEventListener("click", (ev) => {
   } else if (act === "refresh") {
     load();
   } else if (act === "lock") {
-    clearPin(); state.model = null; renderLogin();
+    lock();
+  } else if (act === "nuevo") {
+    openNew("gasto");
+  } else if (act === "bandeja") {
+    openBandeja();
+  } else if (act === "ajustes") {
+    openAjustes();
   } else if (act === "toggle-movs") {
     state.showAll = !state.showAll; renderDashboard();
   }
@@ -296,6 +325,8 @@ app.addEventListener("change", (ev) => {
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => { /* la app funciona igual sin instalarse */ });
 }
+
+initForms({ state, reload: load, toast, lock });
 
 state.pin = loadPin();
 if (state.pin) load(); else renderLogin();

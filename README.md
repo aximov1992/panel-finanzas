@@ -48,3 +48,15 @@ Qué hace:
 Para actualizar el script: pegar el archivo, luego Implementar > Administrar implementaciones > editar la existente > Versión nueva. Así la URL no cambia.
 
 Pruebas: `npm test` (planilla simulada, datos inventados).
+
+## Carga desde el panel (Etapa 2)
+
+Requiere el script `apps-script/Code.gs` en su versión 2.x instalado y publicado como **nueva versión** en la planilla.
+
+- **Botón +**: carga un gasto (con sugerencia de categoría según tu historial y aviso si ya hay uno parecido), un impuesto o un aporte/retiro de inversión.
+- **Por revisar**: bandeja de avisos capturados (Etapa 3). Cada uno se confirma con su categoría o se descarta.
+- **Ajustes**: ingreso del mes, categorías nuevas (se guardan en Config, columna I), meta del fondo de emergencia (en meses de gasto o en monto) y bloqueo de sesión.
+- Si el script de la planilla está desactualizado, los formularios avisan en lugar de fallar en silencio.
+- Después de cada carga el panel se actualiza solo, sin pantalla de carga.
+
+Las pruebas (`npm test`) usan datos inventados; nunca se suben resúmenes ni planillas reales.

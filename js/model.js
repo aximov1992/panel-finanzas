@@ -77,7 +77,7 @@ function parseConfig(values) {
 
   return {
     cotizacion, actualizacion, cycles, ingresos,
-    categorias: column(0), medios: column(2), monedas: column(4), estados: column(6),
+    categorias: column(0), extras: column(8), medios: column(2), monedas: column(4), estados: column(6),
   };
 }
 
@@ -105,11 +105,53 @@ function parseAportes(values) {
   return out;
 }
 
+function parseImpuestos(values) {
+  const out = [];
+  if (!values) return out;
+  for (let i = 1; i < values.length; i++) {
+    const r = values[i];
+    const fecha = toYMD(r[0]);
+    const monto = num(r[3]);
+    if (!fecha || !monto) continue;
+    out.push({ fecha, origen: String(r[1] ?? ""), tipo: String(r[2] ?? ""), monto, resumen: String(r[4] ?? "") || fecha.slice(0, 7), nota: String(r[5] ?? "") });
+  }
+  return out;
+}
+
+function parseBandeja(values) {
+  const out = [];
+  if (!values) return out;
+  for (let i = 1; i < values.length; i++) {
+    const r = values[i];
+    if (!r[0]) continue;
+    const estado = String(r[8] ?? "");
+    if (estado !== "pendiente" && estado !== "sin_parsear") continue;
+    const recibido = r[1] ? new Date(r[1]) : null;
+    out.push({
+      id: String(r[0]), recibido: recibido && !isNaN(recibido) ? recibido : null,
+      fecha: recibido && !isNaN(recibido) ? ymdFormatter.format(recibido) : "",
+      texto: String(r[2] ?? ""), monto: num(r[3]), comercio: String(r[4] ?? ""), medio: String(r[5] ?? ""),
+      tarjeta: String(r[6] ?? ""), hora: String(r[7] ?? ""), estado,
+    });
+  }
+  return out.sort((a, b) => (a.recibido?.getTime() ?? 0) - (b.recibido?.getTime() ?? 0));
+}
+
+function parseSettings(values) {
+  const out = {};
+  if (!values) return out;
+  for (let i = 1; i < values.length; i++) if (values[i][0]) out[String(values[i][0])] = values[i][1];
+  return out;
+}
+
 export function buildModel(raw, today = todayYMD()) {
   const cfg = parseConfig(raw.Config.values);
   const { cotizacion: cot, cycles } = cfg;
   const budget = parsePresupuesto(raw.Presupuesto?.values);
   const aportes = parseAportes(raw.Inversiones?.values);
+  const impuestos = parseImpuestos(raw.Impuestos?.values);
+  const bandeja = parseBandeja(raw.Bandeja?.values);
+  const settings = parseSettings(raw.Panel_Config?.values);
 
   // Movimientos: encabezados en la fila 3, datos desde la fila 4.
   const movs = [];
@@ -149,7 +191,7 @@ export function buildModel(raw, today = todayYMD()) {
   }
 
   const periodIndex = new Map(cycles.map((c, i) => [c.period, i]));
-  const cats = cfg.categorias;
+  const cats = [...cfg.categorias, ...cfg.extras];
 
   function monthSummary(period) {
     const i = periodIndex.get(period);
@@ -162,9 +204,13 @@ export function buildModel(raw, today = todayYMD()) {
     });
     const ingreso = cfg.ingresos.get(period) ?? 0;
     const aporte = sum(aportes.filter((a) => a.fecha.slice(0, 7) === period), (a) => a.monto);
-    const gasto = cashTotal + cardTotal;
+    const imp = impuestos.filter((x) => x.resumen === period);
+    const impTotal = sum(imp, (x) => x.monto);
+    const impByTipo = [...imp.reduce((m2, x) => m2.set(x.tipo, (m2.get(x.tipo) ?? 0) + x.monto), new Map())]
+      .map(([tipo, monto]) => ({ tipo, monto })).sort((a, b) => b.monto - a.monto);
+    const gasto = cashTotal + cardTotal + impTotal;
     return {
-      period, gasto, cashTotal, cardTotal, byCat, ingreso, aporte,
+      period, gasto, cashTotal, cardTotal, impuestos: impTotal, impuestosPorTipo: impByTipo, byCat, ingreso, aporte,
       tasaAhorro: ingreso > 0 ? aporte / ingreso : null,
       presupuestoTotal: sum(byCat, (x) => x.presupuesto),
     };
@@ -188,12 +234,37 @@ export function buildModel(raw, today = todayYMD()) {
     movs.filter((m) => m.fecha.slice(0, 7) === period).sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : Number(b.id) - Number(a.id)));
 
   const dates = movs.map((m) => m.fecha).sort();
+  const firstPeriod = dates[0]?.slice(0, 7) ?? today.slice(0, 7);
+
+  // Fondo de emergencia: saldo = aportes (menos retiros) con el destino configurado.
+  const destinoFondo = String(settings.fondo_destino || "Fondo de emergencia");
+  const saldoFondo = sum(aportes.filter((a) => normText(a.destino) === normText(destinoFondo)), (a) => a.monto);
+  const closed = [];
+  for (let q = shiftPeriod(today.slice(0, 7), -1); q > firstPeriod && closed.length < 3; q = shiftPeriod(q, -1)) {
+    const g = monthSummary(q).gasto;
+    if (g > 0) closed.push(g);
+  }
+  const gastoPromedio = closed.length ? sum(closed, (x) => x) / closed.length : 0;
+  const metaMeses = num(settings.fondo_meta_meses);
+  const metaMonto = num(settings.fondo_meta_monto);
+  const objetivo = metaMonto > 0 ? metaMonto : metaMeses > 0 ? metaMeses * gastoPromedio : 0;
+  const fondo = {
+    destino: destinoFondo, saldo: saldoFondo, metaMeses, metaMonto, gastoPromedio, objetivo,
+    cobertura: gastoPromedio > 0 ? saldoFondo / gastoPromedio : null,
+    avance: objetivo > 0 ? saldoFondo / objetivo : null,
+  };
+
   return {
     today, cot, cotActualizacion: cfg.actualizacion, cycles, categorias: cats,
+    categoriasBase: cfg.categorias, categoriasNuevas: cfg.extras,
     medios: cfg.medios, monedas: cfg.monedas, estados: cfg.estados,
-    movs, firstPeriod: dates[0]?.slice(0, 7) ?? today.slice(0, 7), nextDue, forecast,
-    monthSummary, movsByPeriod, ingresos: cfg.ingresos,
+    movs, firstPeriod, nextDue, forecast, monthSummary, movsByPeriod, ingresos: cfg.ingresos,
+    impuestos, bandeja, aportes, fondo, settings,
   };
+}
+
+function normText(s) {
+  return String(s ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 // Semáforo igual al de la planilla: compromiso de tarjeta / ingreso del mes.
