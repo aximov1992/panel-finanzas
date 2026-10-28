@@ -2,5 +2,5 @@
   "name": "panel-finanzas",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node --test tests/model.test.mjs" }
+  "scripts": { "test": "node --test \"tests/*.test.mjs\"" }
 }
