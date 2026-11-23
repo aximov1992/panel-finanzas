@@ -2,6 +2,7 @@ import { readAll, ApiError } from "./api.js";
 import { buildModel, semaforo, shiftPeriod, todayYMD } from "./model.js";
 import { buildSuggester, subcategoriesByCat } from "./suggest.js";
 import { initForms, openNew, openBandeja, openAjustes } from "./forms.js";
+import { initImporter, openImport } from "./importer.js";
 import { ars, usd, dec, day, periodLong, periodShort, esc, nfPct } from "./fmt.js";
 
 const app = document.getElementById("app");
@@ -241,6 +242,7 @@ function renderDashboard() {
       </nav>
       <div class="actions">
         <button class="btn" data-act="bandeja">Por revisar${m.bandeja.length ? `<span class="badge-n">${m.bandeja.length}</span>` : ""}</button>
+        <button class="btn" data-act="importar">Importar PDF</button>
         <button class="btn" data-act="refresh">Actualizar</button>
         <button class="btn" data-act="ajustes">Ajustes</button>
       </div>
@@ -309,6 +311,8 @@ app.addEventListener("click", (ev) => {
     lock();
   } else if (act === "nuevo") {
     openNew("gasto");
+  } else if (act === "importar") {
+    openImport();
   } else if (act === "bandeja") {
     openBandeja();
   } else if (act === "ajustes") {
@@ -327,6 +331,7 @@ if ("serviceWorker" in navigator) {
 }
 
 initForms({ state, reload: load, toast, lock });
+initImporter({ state, reload: load, toast });
 
 state.pin = loadPin();
 if (state.pin) load(); else renderLogin();

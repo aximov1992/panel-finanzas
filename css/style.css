@@ -132,13 +132,13 @@ h1, h2, h3, p { margin: 0; }
 [hidden] { display: none !important; }
 
 /* Formularios en hoja inferior */
-dialog#dlg {
+dialog.sheet {
   border: 1px solid var(--line); background: var(--surface); color: var(--fg);
   padding: 0; width: min(560px, 100%); max-height: min(92dvh, 100%);
   margin: auto auto 0; border-radius: 14px 14px 0 0; overflow: hidden;
 }
-@media (min-width: 700px) { dialog#dlg { margin: auto; border-radius: 14px; } }
-dialog#dlg::backdrop { background: rgba(4, 7, 10, .72); }
+@media (min-width: 700px) { dialog.sheet { margin: auto; border-radius: 14px; } }
+dialog.sheet::backdrop { background: rgba(4, 7, 10, .72); }
 .dlg-in { display: flex; flex-direction: column; max-height: min(92dvh, 100%); }
 .dlg-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); }
 .dlg-head h2 { font-size: 17px; font-weight: 600; }
@@ -189,3 +189,22 @@ body { padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
 
 /* Impuestos */
 .tax-total { font-family: var(--mono); font-size: 22px; font-weight: 500; }
+
+/* Importador de PDF */
+.file-pick { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.file-pick input[type=file] { font-size: 15px; max-width: 100%; }
+.imp-doc { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--bg); font-size: 14px; }
+.imp-doc .ok { color: var(--good); } .imp-doc .no { color: var(--warn); }
+.imp-sec { display: flex; flex-direction: column; gap: 0; }
+.imp-sec > h3 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 6px 0; }
+.imp-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; padding: 10px 0; border-top: 1px solid var(--line); align-items: start; }
+.imp-row input[type=checkbox] { width: 22px; height: 22px; margin-top: 2px; accent-color: var(--accent); }
+.imp-top { display: flex; justify-content: space-between; gap: 12px; min-width: 0; }
+.imp-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imp-a { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 14px; white-space: nowrap; }
+.imp-m { font-size: 12px; color: var(--muted); grid-column: 2; }
+.imp-row select { grid-column: 2; margin-top: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; min-height: 36px; font-size: 14px; max-width: 100%; }
+.chip-k { font-size: 11px; padding: 0 6px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); margin-right: 6px; }
+.imp-foot { position: sticky; bottom: 0; background: var(--surface); padding-top: 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+details.imp-more summary { cursor: pointer; color: var(--muted); padding: 6px 0; }
+.imp-res { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }

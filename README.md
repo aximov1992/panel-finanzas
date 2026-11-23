@@ -60,3 +60,16 @@ Requiere el script `apps-script/Code.gs` en su versión 2.x instalado y publicad
 - Después de cada carga el panel se actualiza solo, sin pantalla de carga.
 
 Las pruebas (`npm test`) usan datos inventados; nunca se suben resúmenes ni planillas reales.
+
+## Importar resúmenes en PDF (Etapa 2c)
+
+Botón **Importar PDF** en la barra de arriba. Acepta el resumen de la **Visa del Galicia** y el **extracto de la caja de ahorro**, uno o los dos a la vez.
+
+- El PDF se lee **en tu dispositivo** (PDF.js, incluido en `vendor/pdfjs/`). No se sube a ningún lado: al script solo llegan las filas que confirmás.
+- Antes de mostrar nada se verifica la lectura: en la Visa, la suma de los consumos contra el total del resumen; en la caja, que cada saldo cierre con el anterior. Si no coincide, avisa.
+- Cada línea se compara con la planilla y queda como: **para importar**, **ya cargado**, **ignorado** (pago de tarjeta, compra de dólares, transferencias entre cuentas propias, anulaciones) o **para revisar** (por ejemplo, cuotas distintas a las del resumen).
+- Qué va a dónde: compras → Movimientos, impuestos → hoja Impuestos (con su tipo), acreditación de haberes → ingreso del mes, transferencia de Balanz → retiro en Inversiones, dinero que te mandan personas → reintegro en negativo.
+- Los reintegros de promoción se restan de la compra que los originó, como se carga en la planilla.
+- Las cuotas de compras anteriores a la planilla no se cargan solas: quedan para revisar.
+
+Código: `js/pdfparse.js` (lee el texto), `js/importplan.js` (decide qué hacer con cada línea), `js/importer.js` (pantalla). Pruebas con datos inventados en `tests/import.test.mjs`.

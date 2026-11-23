@@ -16,6 +16,7 @@ export function initForms(context) {
   ctx = context;
   dlg = document.createElement("dialog");
   dlg.id = "dlg";
+  dlg.className = "sheet";
   dlg.setAttribute("aria-label", "Formulario");
   document.body.append(dlg);
   dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
